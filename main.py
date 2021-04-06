@@ -9,12 +9,12 @@ import queue
 import os
 from datetime import datetime
 
+#GLOBAL VARIABLES
 SCREEN_HEIGHT = 480
 SCREEN_WIDTH = 640
-
+SMALL_SCREEN_HEIGHT = SCREEN_HEIGHT // 5
+SMALL_SCREEN_WIDTH = SCREEN_WIDTH // 5
 BLACK_SCREEN = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH,3), np.uint8)
-# SCREEN_HEIGHT = 900
-# SCREEN_WIDTH = 1600
 
 def show_webcam(mirror=False):
     #user input queue
@@ -25,9 +25,15 @@ def show_webcam(mirror=False):
     #set video capture
     cap = cv2.VideoCapture(0)
 
+    directory = "videos"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
     #video codec and recording setup
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    # out = cv2.VideoWriter(f"videos/recording({datetime.now()})", fourcc, 20.0, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    video_out_filename = f"videos/recording({datetime.now()}).avi"
+    out = cv2.VideoWriter(video_out_filename, fourcc, 20.0, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
 
     # Check if camera opened successfully
     if (cap.isOpened()== False): 
@@ -45,19 +51,20 @@ def show_webcam(mirror=False):
     while(cap.isOpened()):
         ret, frame = cap.read()
         if ret == True:
-
-            
+            #flip camera perspective
+            flipped_cam = cv2.flip(frame,1)
             if camera == False:
+                small_cam = cv2.resize(flipped_cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
                 frame = screen
+                frame[0:SMALL_SCREEN_HEIGHT, SCREEN_WIDTH - SMALL_SCREEN_WIDTH:SCREEN_WIDTH] = small_cam
             elif picture == True:
+                small_cam = cv2.resize(flipped_cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
                 frame = last_image
+                frame[0 : SMALL_SCREEN_HEIGHT, SCREEN_WIDTH - SMALL_SCREEN_WIDTH:SCREEN_WIDTH] = small_cam
             elif mirror:
-                #flip camera perspective
-                frame = cv2.flip(frame,1)
-
+                frame = flipped_cam
 
             addimages(frame, extras)
-            
             out.write(frame)
 
             #display frame
@@ -69,6 +76,7 @@ def show_webcam(mirror=False):
 
             #quit program
             if key == ord('q'):
+                save_video(out,cap, video_out_filename)
                 break
             
             #get filename from user
@@ -96,20 +104,26 @@ def show_webcam(mirror=False):
             elif key == ord("m"):
                 screen = cv2.resize(show_screen(), (SCREEN_WIDTH, SCREEN_HEIGHT))
                 camera = not camera
-            elif key == ord("r"):
+            elif key == ord("i"):
                 if thread != None:
                     thread.join()
                     last_image = get_last_image(q.get())
                     thread = None
                 picture = not picture
+            elif key == ord("r"):
+                #reset logic
+                save_video(out, cap, video_out_filename)
+                main()
                 
         else: 
             break
 
+
+def save_video(out, cap, video_out_filename):
     out.release()
     cap.release()
-
     cv2.destroyAllWindows()
+    print(f"\nVideo successfully saved at \"{video_out_filename}\"\n")
 
 def save_screenshot(frame):
     directory = "screenshots"
@@ -143,8 +157,8 @@ def process_image(filename, frame, extras):
     width, height, _ = image.shape
 
     #process image
-    dim_height = SCREEN_HEIGHT//5
-    dim_width = SCREEN_WIDTH//5
+    dim_height = SMALL_SCREEN_HEIGHT
+    dim_width = SMALL_SCREEN_WIDTH
     dim = (dim_width, dim_height)
 
     correct_size_image = cv2.resize(image, dim)
@@ -181,16 +195,17 @@ def display_commands():
 
     print("Type \"w\" to input a .png filename to be used with other commands\n" + 
         "Type \"c\" to display a small version of that image on the left side of the screen\n" +
-        "Type \"r\" to toggle camera with last image inputted\n" +
+        "Type \"i\" to toggle camera with last image inputted\n" +
         "Type \"d\" to delete the last image from the screen\n" +
         "Type \"s\" to save screenshot of the current presentation\n" +
         "Type \"m\" to toggle monitor screencap instead of camera\n" +
-        
-        "Type \"h\" to see these commands again\n" +
+        "Type \"r\" to restart program and save video\n" +
+        "Type \"h\" to display these commands again\n" +
         "Type \"q\" to exit program\n")
 
 
 def main():
+    #os.system('cls' if os.name == 'nt' else 'clear')
     print("Welcome to OpenCV presentation software 1.0\n"+
                 "All commands must be done with the window in focus.\n" +
                 "Type \"h\" to view commands.\n")
@@ -198,7 +213,6 @@ def main():
     if not os.path.exists(directory):
         os.makedirs(directory)
     show_webcam(mirror=True)
-	#show_screen()
 
 
 if __name__ == '__main__':
