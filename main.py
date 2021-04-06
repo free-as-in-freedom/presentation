@@ -12,6 +12,10 @@ from datetime import datetime
 SCREEN_HEIGHT = 480
 SCREEN_WIDTH = 640
 
+BLACK_SCREEN = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH,3), np.uint8)
+# SCREEN_HEIGHT = 900
+# SCREEN_WIDTH = 1600
+
 def show_webcam(mirror=False):
     #user input queue
     q = queue.Queue()
@@ -31,17 +35,29 @@ def show_webcam(mirror=False):
 
     #initialize extra image list
     extras = []
+    last_image = BLACK_SCREEN
+    screen = BLACK_SCREEN
+    camera = True
+    picture = False
+    
 
     #camera loop
     while(cap.isOpened()):
         ret, frame = cap.read()
         if ret == True:
-            #flip camera perspective
-            if mirror:
-                frame = cv2.flip(frame,1)
+
             
+            if camera == False:
+                frame = screen
+            elif picture == True:
+                frame = last_image
+            elif mirror:
+                #flip camera perspective
+                frame = cv2.flip(frame,1)
+
 
             addimages(frame, extras)
+            
             out.write(frame)
 
             #display frame
@@ -63,11 +79,10 @@ def show_webcam(mirror=False):
             #commit filename and show image file
             elif key == ord("c") and thread != None:
                 thread.join()
-                filename = q.get()
                 #put image in extras
-                process_image(filename,frame, extras)
-                
+                process_image(q.get(),frame, extras)
                 thread = None
+
             #delete last image
             elif key == ord("d"):
                 if len(extras) != 0:
@@ -78,8 +93,16 @@ def show_webcam(mirror=False):
             #save screenshot of presentation
             elif key == ord("s"):
                 save_screenshot(frame)
-
-            
+            elif key == ord("m"):
+                screen = cv2.resize(show_screen(), (SCREEN_WIDTH, SCREEN_HEIGHT))
+                camera = not camera
+            elif key == ord("r"):
+                if thread != None:
+                    thread.join()
+                    last_image = get_last_image(q.get())
+                    thread = None
+                picture = not picture
+                
         else: 
             break
 
@@ -96,6 +119,18 @@ def save_screenshot(frame):
     cv2.imwrite(filename, frame)
     print(f"\nScreenshot successfully saved at \"{filename}\"\n")
     
+
+def get_last_image(filename):
+    file_path = f"images/{filename}"
+    #check if file path exists
+    if not os.path.exists(file_path):
+        print(f"\"{file_path}\" is not a valid file path. Try agian by pressing \"w\"\n")
+        return BLACK_SCREEN
+    
+    image = cv2.imread(f"{file_path}")
+    width, height, _ = image.shape
+
+    return cv2.resize(image, (SCREEN_WIDTH,SCREEN_HEIGHT))
 
 def process_image(filename, frame, extras):
     file_path = f"images/{filename}"
@@ -131,10 +166,10 @@ def addimages(frame, extras):
             start_y += width
         
 def show_screen():
-	image = pyautogui.screenshot()
-	image = cv2.cvtColor(np.array(image),
+	screenshot = pyautogui.screenshot()
+	screenshot = cv2.cvtColor(np.array(screenshot),
 				 cv2.COLOR_RGB2BGR)
-	cv2.imshow("",image) 
+	return screenshot
 
 def get_filename(q):
     user_input = input("Input an image filename here: ")
@@ -144,10 +179,13 @@ def get_filename(q):
 
 def display_commands():
 
-    print("Type \"w\" to input a .png filename to display on screen\n" + 
-        "Type \"c\" to display that image file to the screen\n" +
+    print("Type \"w\" to input a .png filename to be used with other commands\n" + 
+        "Type \"c\" to display a small version of that image on the left side of the screen\n" +
+        "Type \"r\" to toggle camera with last image inputted\n" +
         "Type \"d\" to delete the last image from the screen\n" +
         "Type \"s\" to save screenshot of the current presentation\n" +
+        "Type \"m\" to toggle monitor screencap instead of camera\n" +
+        
         "Type \"h\" to see these commands again\n" +
         "Type \"q\" to exit program\n")
 
