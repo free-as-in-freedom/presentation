@@ -7,6 +7,7 @@ import numpy as np
 import threading
 import queue
 import os
+from datetime import datetime
 
 SCREEN_HEIGHT = 480
 SCREEN_WIDTH = 640
@@ -28,6 +29,7 @@ def show_webcam(mirror=False):
     if (cap.isOpened()== False): 
         print("Error opening video stream or file")
 
+    #initialize extra image list
     extras = []
 
     #camera loop
@@ -66,11 +68,16 @@ def show_webcam(mirror=False):
                 process_image(filename,frame, extras)
                 
                 thread = None
+            #delete last image
             elif key == ord("d"):
                 if len(extras) != 0:
                     extras.pop()
+            #display help screen
             elif key == ord("h"):
                 display_commands()
+            #save screenshot of presentation
+            elif key == ord("s"):
+                save_screenshot(frame)
 
             
         else: 
@@ -81,9 +88,17 @@ def show_webcam(mirror=False):
 
     cv2.destroyAllWindows()
 
+def save_screenshot(frame):
+    directory = "screenshots"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    filename = f"{directory}/screenshot({datetime.now()}).png"
+    cv2.imwrite(filename, frame)
+    print(f"\nScreenshot successfully saved at \"{filename}\"\n")
+    
+
 def process_image(filename, frame, extras):
     file_path = f"images/{filename}"
-    
     #check if file path exists
     if not os.path.exists(file_path):
         print(f"\"{file_path}\" is not a valid file path. Try agian by pressing \"w\"\n")
@@ -114,36 +129,33 @@ def addimages(frame, extras):
         if start_x + height > SCREEN_HEIGHT:
             start_x = 0
             start_y += width
-    
-    
         
-    
-        # output the frame to be saved
-
-        
-
-def get_filename(q):
-    user_input = input("Input an image filename here: ")
-    q.put(user_input)
-
-
 def show_screen():
 	image = pyautogui.screenshot()
 	image = cv2.cvtColor(np.array(image),
 				 cv2.COLOR_RGB2BGR)
 	cv2.imshow("",image) 
 
-def display_commands(start = 0):
-    if start != 0:
-        print("Welcome to OpenCV presentation software 1.0\n"+
-                "All commands must be done with the window in focus.\n")
+def get_filename(q):
+    user_input = input("Input an image filename here: ")
+    q.put(user_input)
+
+
+
+def display_commands():
+
     print("Type \"w\" to input a .png filename to display on screen\n" + 
         "Type \"c\" to display that image file to the screen\n" +
         "Type \"d\" to delete the last image from the screen\n" +
+        "Type \"s\" to save screenshot of the current presentation\n" +
         "Type \"h\" to see these commands again\n" +
         "Type \"q\" to exit program\n")
+
+
 def main():
-    display_commands(1)
+    print("Welcome to OpenCV presentation software 1.0\n"+
+                "All commands must be done with the window in focus.\n" +
+                "Type \"h\" to view commands.\n")
     directory = "images"
     if not os.path.exists(directory):
         os.makedirs(directory)
