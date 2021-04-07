@@ -19,9 +19,10 @@ BLACK_SCREEN = np.zeros((SCREEN_HEIGHT,SCREEN_WIDTH,3), np.uint8)
 def show_webcam(mirror=False):
     #user input queue
     q = queue.Queue()
+    string_q = queue.Queue()
     user_input = None
     thread = None
-
+    mirror = True
     #set video capture
     cap = cv2.VideoCapture(0)
 
@@ -30,7 +31,6 @@ def show_webcam(mirror=False):
         os.makedirs(directory)
     #video codec and recording setup
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    # out = cv2.VideoWriter(f"videos/recording({datetime.now()})", fourcc, 20.0, (SCREEN_WIDTH, SCREEN_HEIGHT))
     video_out_filename = f"videos/recording({datetime.now()}).avi"
     out = cv2.VideoWriter(video_out_filename, fourcc, 20.0, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
@@ -45,26 +45,31 @@ def show_webcam(mirror=False):
     screen = BLACK_SCREEN
     camera = True
     picture = False
-    
+    string = ""
 
     #camera loop
     while(cap.isOpened()):
         ret, frame = cap.read()
         if ret == True:
             #flip camera perspective
-            flipped_cam = cv2.flip(frame,1)
+            if mirror: 
+                cam = cv2.flip(frame,1)
+            else:
+                cam = frame
             if camera == False:
-                small_cam = cv2.resize(flipped_cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
+                small_cam = cv2.resize(cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
                 frame = screen
                 frame[0:SMALL_SCREEN_HEIGHT, SCREEN_WIDTH - SMALL_SCREEN_WIDTH:SCREEN_WIDTH] = small_cam
+
             elif picture == True:
-                small_cam = cv2.resize(flipped_cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
+                small_cam = cv2.resize(cam, (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT))
                 frame = last_image
                 frame[0 : SMALL_SCREEN_HEIGHT, SCREEN_WIDTH - SMALL_SCREEN_WIDTH:SCREEN_WIDTH] = small_cam
             elif mirror:
-                frame = flipped_cam
+                frame = cam
 
-            addimages(frame, extras)
+            add_images(frame, extras)
+            display_text(frame, string)
             out.write(frame)
 
             #display frame
@@ -114,6 +119,17 @@ def show_webcam(mirror=False):
                 #reset logic
                 save_video(out, cap, video_out_filename)
                 main()
+            elif key == ord("t"):
+                if thread != None:
+                    thread.join()
+                thread = threading.Thread(target = get_string, args=(q,))
+                thread.start()
+            elif key == ord("p") and thread != None:
+                thread.join()
+                thread = None
+                string = q.get()
+            elif key == ord("f"):
+                mirror = not mirror
                 
         else: 
             break
@@ -157,15 +173,12 @@ def process_image(filename, frame, extras):
     width, height, _ = image.shape
 
     #process image
-    dim_height = SMALL_SCREEN_HEIGHT
-    dim_width = SMALL_SCREEN_WIDTH
-    dim = (dim_width, dim_height)
-
+    dim = (SMALL_SCREEN_WIDTH, SMALL_SCREEN_HEIGHT)
     correct_size_image = cv2.resize(image, dim)
     extras.append(correct_size_image)
     print(f"Displayed image #{len(extras)}")
 
-def addimages(frame, extras):            
+def add_images(frame, extras):            
     start_x = 0
     start_y = 0
     for img in extras:
@@ -178,6 +191,29 @@ def addimages(frame, extras):
         if start_x + height > SCREEN_HEIGHT:
             start_x = 0
             start_y += width
+
+def display_text(frame, text = ""):
+    # font
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    # origin
+    textsize = cv2.getTextSize(text, font, 1, 2)[0]
+    text_x = (SCREEN_WIDTH - textsize[0]) // 2 
+    text_y = (SCREEN_HEIGHT - textsize[1]) // 2 + int(0.4 * SCREEN_HEIGHT)
+    org = (text_x, text_y)
+    
+    # fontScale
+    fontScale = 1
+    
+    # Red color in BGR
+    color = (0, 0, 255)
+    
+    # Line thickness of 2 px
+    thickness = 2
+    
+    # Using cv2.putText() method
+    frame = cv2.putText(frame, text, org, font, fontScale, 
+                    color, thickness, cv2.LINE_AA, False)
         
 def show_screen():
 	screenshot = pyautogui.screenshot()
@@ -189,6 +225,9 @@ def get_filename(q):
     user_input = input("Input an image filename here: ")
     q.put(user_input)
 
+def get_string(q):
+    user_input = input("Input string: ")
+    q.put(user_input)
 
 
 def display_commands():
@@ -199,21 +238,23 @@ def display_commands():
         "Type \"d\" to delete the last image from the screen\n" +
         "Type \"s\" to save screenshot of the current presentation\n" +
         "Type \"m\" to toggle monitor screencap instead of camera\n" +
+        "Type \"t\" to type text to be displayed on screen\n" +
+        "Type \"p\" to display text\n" +
+        "Type \"f\" flip camera\n" +
         "Type \"r\" to restart program and save video\n" +
         "Type \"h\" to display these commands again\n" +
         "Type \"q\" to exit program\n")
 
 
 def main():
-    #os.system('cls' if os.name == 'nt' else 'clear')
-    print("Welcome to OpenCV presentation software 1.0\n"+
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Welcome to OPS 1.0 (OpenCV Presentation Software) \n"+
                 "All commands must be done with the window in focus.\n" +
                 "Type \"h\" to view commands.\n")
     directory = "images"
     if not os.path.exists(directory):
         os.makedirs(directory)
-    show_webcam(mirror=True)
-
+    show_webcam()
 
 if __name__ == '__main__':
     main()
